@@ -1,0 +1,24 @@
+[{
+  "id": "m_goblin_grunt",
+  "race": "goblin",
+  "char": "g",
+  "color": [0, 255, 0],
+  "level": 1,
+  "class": "fighter",
+  "rank": "grunt",
+  "min_health": 20,
+  "max_health": 30,
+  "inventory": ["handaxe"],
+  "experience": 10
+}, {
+  "id": "m_goblin_wizard",
+  "prototype": "goblin_grunt",
+  "class": "wizard",
+  "additional_inventory": ["staff"],
+  "spells": ["fireball", "frost_ray"]
+}, {
+  "id": "m_goblin_archer",
+  "prototype": "goblin_grunt",
+  "class": "ranger",
+  "inventory": ["short_bow"]
+}]

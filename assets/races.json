@@ -1,0 +1,10 @@
+[{
+  "id": "race_human",
+  "name": "human"
+}, {
+  "id": "race-goblin",
+  "name": "goblin",
+  "char": "g",
+  "capital_char": "G",
+  "color": "200"
+}]
