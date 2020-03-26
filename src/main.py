@@ -3,21 +3,19 @@ import json
 
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 45
+PANEL_HEIGHT = 7
 LIMIT_FPS = 20
 
 MAP_WIDTH = 80
-MAP_HEIGHT = 45
+MAP_HEIGHT = 43
 
 color_dark_wall = libtcod.Color(0, 0, 100)
 color_dark_ground = libtcod.Color(50, 50, 150)
 
 class GameObject:
-  def __init__(self, x, y, char = None, color = None, prototype = None):
+  def __init__(self, x, y, char = None, color = None, prototype = None, components = []):
     self.x = x
     self.y = y
-
-
-    print(prototype)
 
     if char is not None:
       self.char = char
@@ -34,6 +32,10 @@ class GameObject:
       self.color = [0, 0, 0]
 
     self.prototype = prototype
+    self.components = components
+
+  def add_component(self, component):
+    self.components.append(component)
 
   def move(self, dx, dy):
     self.x += dx
@@ -45,6 +47,16 @@ class GameObject:
   
   def clear(self, con) :
     libtcod.console_put_char(con, int(self.x), int(self.y), ' ', libtcod.BKGND_NONE)
+
+class Character:
+  def __init__(self, race, g_class):
+    self.race = race
+    self.g_class = g_class
+
+class Fighter:
+  def __init__(self, hp):
+    self.max_hp = hp
+    self.hp = hp
 
 class Tile:
   def __init__(self, blocked, block_sight = None):
@@ -164,28 +176,60 @@ def handle_keys(object):
     object.move(-1, 0)
   elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT):
     object.move(1, 0)
-  
+
+def render_bar(con, x, y, total_width, name, value, max, fg, bg):
+  bar_width = int(float(value) / max * total_width)
+
+  libtcod.console_set_default_background(con, bg)
+  libtcod.console_rect(con, x, y, total_width, 1, False, libtcod.BKGND_SCREEN)
+
+  libtcod.console_set_default_background(con, fg)
+
+  libtcod.console_set_default_background(con, bg)
+  if bar_width > 0:
+    libtcod.console_rect(con, x, y, bar_width, 1, False, libtcod.BKGND_SCREEN)
+
+  # Text
+  libtcod.console_set_default_foreground(con, libtcod.white)
+  libtcod.console_print_ex(con, x + total_width / 2, y, libtcod.BKGND_NONE, libtcod.CENTER, name + ': ' + str(value) + '/' + str(max))
+
 def main():
+  # Initialize libtcod root console
   # libtcod.console_set_custom_font('arial10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
   libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python dnd', False, renderer=libtcod.RENDERER_SDL2)
 
+  # Create our own main console
   con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
-  
+
+  panel = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
+
+  # Create the world 
   world = World()
 
   world.spawn_game_object("m_goblin_grunt", SCREEN_WIDTH / 2 + 5, SCREEN_HEIGHT / 2)
 
+  # Main loop
   while not libtcod.console_is_window_closed():
     libtcod.console_set_default_foreground(0, libtcod.white)
 
+    # draw the world
     world.render(con)
-    
+
+    # render gui
+    # libtcod.console_set_default_background(panel, libtcod.black)
+    # libtcod.console_clear(panel)
+
+    # render_bar(1, 1, 20, 'HP', world.get_player().hp, world.get_player().max_hp, libtcod.light_red, libtcod.darker_red)
+
+    # Copy our console onto the root console 
     libtcod.console_blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
+    libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, SCREEN_HEIGHT - PANEL_HEIGHT)
 
     libtcod.console_flush()
 
     world.clear(con)
-    
+
+    # Get user input 
     exit = handle_keys(world.get_player())
     
     if exit:

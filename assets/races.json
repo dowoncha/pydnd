@@ -1,10 +1,9 @@
 [{
-  "id": "race_human",
-  "name": "human"
+  "name": "human",
+  "char": "h"
 }, {
-  "id": "race-goblin",
   "name": "goblin",
   "char": "g",
   "capital_char": "G",
-  "color": "200"
+  "color": [0, 255, 0]
 }]

@@ -21,4 +21,25 @@
   "prototype": "goblin_grunt",
   "class": "ranger",
   "inventory": ["short_bow"]
+}, {
+  "id": "m_commoner",
+  "name": "commoner",
+  "ac": 10,
+  "hp": "1d8",
+  "speed": 30,
+  "languages": ["common"],
+  "challenge": 0,
+  "experience": 10
+}, {
+  "id": "m_bandit",
+  "attributes": {
+    "str": 11,
+    "dex": 11,
+    "con": 11,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+  },
+  "challenge": 0.125,
+  "experience": 25
 }]
