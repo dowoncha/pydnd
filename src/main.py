@@ -1,9 +1,10 @@
 import libtcodpy as libtcod
 import textwrap
 import json
+from rect import Rect, Map 
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 80
+SCREEN_HEIGHT = 60
 PANEL_HEIGHT = 7
 LIMIT_FPS = 20
 
@@ -61,43 +62,19 @@ class Fighter:
     self.max_hp = hp
     self.hp = hp
 
-class Tile:
-  def __init__(self, blocked, block_sight = None):
-    self.blocked = blocked
-
-    if block_sight is None: 
-      block_sight = blocked
-
-    self.block_sight = block_sight
-
-class Map:
-  def __init__(self, tiles = None):
-    if tiles is None:
-      tiles = [[ Tile(False)
-        for y in range(MAP_HEIGHT) ]
-          for x in range(MAP_WIDTH) ]
-
-      tiles[30][22].blocked = True
-      tiles[30][22].block_sight = True
-      tiles[50][22].blocked = True
-      tiles[50][22].blocked = True
-
-    self.tiles = tiles
-
-  def render(self, con):
-    for y in range(MAP_HEIGHT):
-      for x in range(MAP_WIDTH):
-        wall = self.tiles[x][y].block_sight
-        if wall: 
-          libtcod.console_set_char_background(con, x, y, color_dark_wall, libtcod.BKGND_SET)
-        else:
-          libtcod.console_set_char_background(con, x, y, color_dark_ground, libtcod.BKGND_SET)
-
 class World:
   def __init__(self):
-    player = GameObject(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, '@', libtcod.white)
+    
+
+    game_map = Map(MAP_WIDTH, MAP_HEIGHT)
+    start_room = game_map.rooms[0]
+
+    playerx = start_room.w / 2 + start_room.x1
+    playery = start_room.h / 2 + start_room.y1
+
+    player = GameObject(playerx, playery, '@', libtcod.white)
     npc = GameObject(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2, 't', libtcod.yellow)
-    game_map = Map()
+    
 
     self.load_assets()
 
@@ -216,7 +193,7 @@ def message(new_msg, color = libtcod.white):
 def main():
   # Initialize libtcod root console
   libtcod.console_set_custom_font('arial10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
-  libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python dnd', False, renderer=libtcod.RENDERER_SDL2)
+  libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python dnd', False, renderer=libtcod.RENDERER_OPENGL2)
 
   # Create our own main console
   con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
