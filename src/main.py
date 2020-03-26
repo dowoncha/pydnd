@@ -1,13 +1,16 @@
 import libtcodpy as libtcod
+import textwrap
 import json
 
-SCREEN_WIDTH = 80
-SCREEN_HEIGHT = 45
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
 PANEL_HEIGHT = 7
 LIMIT_FPS = 20
 
 MAP_WIDTH = 80
 MAP_HEIGHT = 43
+
+BAR_WIDTH = 20
 
 color_dark_wall = libtcod.Color(0, 0, 100)
 color_dark_ground = libtcod.Color(50, 50, 150)
@@ -183,7 +186,7 @@ def render_bar(con, x, y, total_width, name, value, max, fg, bg):
   libtcod.console_set_default_background(con, bg)
   libtcod.console_rect(con, x, y, total_width, 1, False, libtcod.BKGND_SCREEN)
 
-  libtcod.console_set_default_background(con, fg)
+  libtcod.console_set_default_foreground(con, fg)
 
   libtcod.console_set_default_background(con, bg)
   if bar_width > 0:
@@ -191,17 +194,36 @@ def render_bar(con, x, y, total_width, name, value, max, fg, bg):
 
   # Text
   libtcod.console_set_default_foreground(con, libtcod.white)
-  libtcod.console_print_ex(con, x + total_width / 2, y, libtcod.BKGND_NONE, libtcod.CENTER, name + ': ' + str(value) + '/' + str(max))
+  libtcod.console_print_ex(con, int(x + total_width / 2), y, libtcod.BKGND_NONE, libtcod.CENTER, name + ': ' + str(value) + '/' + str(max))
+
+MSG_X = BAR_WIDTH + 2
+MSG_WIDTH = SCREEN_WIDTH - BAR_WIDTH - 2
+MSG_HEIGHT = PANEL_HEIGHT - 1
+
+game_msgs = []
+
+def message(new_msg, color = libtcod.white):
+  new_msg_lines = textwrap.wrap(new_msg, MSG_WIDTH)
+
+  for line in new_msg_lines:
+    # If the buffer is full, remove the first line to make rom for the new one
+    if len(game_msgs) == MSG_HEIGHT:
+      del game_msgs[0]
+
+    # add the new line as a tuple, with tthe text and the color
+    game_msgs.append((line, color))
 
 def main():
   # Initialize libtcod root console
-  # libtcod.console_set_custom_font('arial10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
+  libtcod.console_set_custom_font('arial10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
   libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python dnd', False, renderer=libtcod.RENDERER_SDL2)
 
   # Create our own main console
   con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
 
   panel = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
+
+  message("Welcome stranger! Prepare to perish in the dungeon", libtcod.red)
 
   # Create the world 
   world = World()
@@ -216,10 +238,17 @@ def main():
     world.render(con)
 
     # render gui
-    # libtcod.console_set_default_background(panel, libtcod.black)
-    # libtcod.console_clear(panel)
+    libtcod.console_set_default_background(panel, libtcod.black)
+    libtcod.console_clear(panel)
 
-    # render_bar(1, 1, 20, 'HP', world.get_player().hp, world.get_player().max_hp, libtcod.light_red, libtcod.darker_red)
+    # render msgs
+    y = 1
+    for (line, color) in game_msgs:
+      libtcod.console_set_default_foreground(panel, color)
+      libtcod.console_print_ex(panel, MSG_X, y, libtcod.BKGND_NONE, libtcod.LEFT, line)
+      y += 1
+    
+    render_bar(con, 1, 1, BAR_WIDTH, 'HP', 90, 100, libtcod.light_red, libtcod.darker_red)
 
     # Copy our console onto the root console 
     libtcod.console_blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
