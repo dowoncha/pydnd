@@ -1,10 +1,11 @@
 import libtcodpy as libtcod
 import textwrap
 import json
+import queue
 from rect import Rect, Map 
 
 SCREEN_WIDTH = 80
-SCREEN_HEIGHT = 60
+SCREEN_HEIGHT = 43
 PANEL_HEIGHT = 7
 LIMIT_FPS = 20
 
@@ -17,26 +18,27 @@ color_dark_wall = libtcod.Color(0, 0, 100)
 color_dark_ground = libtcod.Color(50, 50, 150)
 
 class GameObject:
-  def __init__(self, x, y, char = None, color = None, prototype = None, components = []):
-    self.x = x
-    self.y = y
+  def __init__(self, x, y, name = "game_object", char = None, color = None, prototype = None, blocks = False):
+    self.x = int(x)
+    self.y = int(y)
+    self.name = name
+    self.blocks = blocks
 
     if char is not None:
       self.char = char
-    elif prototype.get('char'):
+    elif prototype and prototype.get('char'):
       self.char = prototype.get('char')
     else:
       self.char = ' '
 
     if color is not None:
       self.color = color
-    elif prototype.get('color'):
+    elif prototype and prototype.get('color'):
       self.color = prototype.get('color')
     else:
       self.color = [0, 0, 0]
 
     self.prototype = prototype
-    self.components = components
 
   def add_component(self, component):
     self.components.append(component)
@@ -64,30 +66,54 @@ class Fighter:
 
 class World:
   def __init__(self):
-    
-
     game_map = Map(MAP_WIDTH, MAP_HEIGHT)
     start_room = game_map.rooms[0]
 
     playerx = start_room.w / 2 + start_room.x1
     playery = start_room.h / 2 + start_room.y1
 
-    player = GameObject(playerx, playery, '@', libtcod.white)
-    npc = GameObject(SCREEN_WIDTH / 2 - 5, SCREEN_HEIGHT / 2, 't', libtcod.yellow)
-    
+    player = GameObject(
+      playerx, 
+      playery, 
+      name = "Gromash the Corpse-Eater", 
+      char = '@', 
+      color = libtcod.white,
+      blocks = True
+    )
+    npc = GameObject(
+      playerx, 
+      playery + 2, 
+      name = "commoner", 
+      char = 'c', 
+      color = libtcod.yellow,
+      blocks = True
+      )
 
     self.load_assets()
 
     self.objects = [npc, player]
     self.game_map = game_map
 
-  def spawn_game_object(self, id, x, y):
+  def is_blocked(self, x, y):
+    if self.game_map.get_tile(x, y).blocked:
+      return True
+
+    for object in self.objects:
+      if object.blocks and object.x == x and object.y == y:
+        return True
+    
+    return False
+
+  def get_map(self):
+    return self.game_map
+
+  def spawn_game_object(self, id, x, y, blocks = False):
     prototype = self.get_prototype(id)
 
     if prototype is None:
       return
 
-    object = GameObject(x, y, prototype = prototype)
+    object = GameObject(x, y, name = id, prototype = prototype, blocks = blocks)
 
     self.objects.append(object)
 
@@ -141,21 +167,30 @@ class World:
     for object in self.objects:
       object.clear(console)
 
-def handle_keys(object):
-  key = libtcod.console_wait_for_keypress(True)
-  if key.vk == libtcod.KEY_ENTER and key.lalt:
-    libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
-  elif key.vk == libtcod.KEY_ESCAPE:
-    return True
+  def update(self):
+    pass
 
-  if libtcod.console_is_key_pressed(libtcod.KEY_UP):
-    object.move(0, -1)
-  elif libtcod.console_is_key_pressed(libtcod.KEY_DOWN):
-    object.move(0, 1)
-  elif libtcod.console_is_key_pressed(libtcod.KEY_LEFT):
-    object.move(-1, 0)
-  elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT):
-    object.move(1, 0)
+  def handle_keys(self):
+    key = libtcod.console_wait_for_keypress(True)
+    if key.vk == libtcod.KEY_ENTER and key.lalt:
+      libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
+    elif key.vk == libtcod.KEY_ESCAPE:
+      return True
+    
+    player = self.get_player()
+
+    if libtcod.console_is_key_pressed(libtcod.KEY_UP):
+      if not self.is_blocked(int(player.x), int(player.y - 1)):
+        player.move(0, -1)
+    elif libtcod.console_is_key_pressed(libtcod.KEY_DOWN):
+      if not self.is_blocked(int(player.x), int(player.y + 1)):
+        player.move(0, 1)
+    elif libtcod.console_is_key_pressed(libtcod.KEY_LEFT):
+      if not self.is_blocked(int(player.x - 1), int(player.y)):
+        player.move(-1, 0)
+    elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT):
+      if not self.is_blocked(int(player.x + 1), int(player.y)):
+        player.move(1, 0)
 
 def render_bar(con, x, y, total_width, name, value, max, fg, bg):
   bar_width = int(float(value) / max * total_width)
@@ -190,6 +225,49 @@ def message(new_msg, color = libtcod.white):
     # add the new line as a tuple, with tthe text and the color
     game_msgs.append((line, color))
 
+def render(world, con, panel):
+  libtcod.console_set_default_foreground(0, libtcod.white)
+
+  # draw the world
+  world.render(con)
+
+  # render gui
+  libtcod.console_set_default_background(panel, libtcod.black)
+  libtcod.console_clear(panel)
+
+  # render msgs
+  y = 1
+  for (line, color) in game_msgs:
+    libtcod.console_set_default_foreground(panel, color)
+    libtcod.console_print_ex(panel, MSG_X, y, libtcod.BKGND_NONE, libtcod.LEFT, line)
+    y += 1
+  
+  render_bar(con, 1, 1, BAR_WIDTH, 'HP', 90, 100, libtcod.light_red, libtcod.darker_red)
+  
+  # render names under mouse
+  libtcod.console_set_default_foreground(panel, libtcod.light_gray)
+  # libtcod.console_print_ex(panel, 1, 0, libtcod.BKGND_NONE, libtcod.LEFT, get_names_under_mouse())
+
+  # Copy our console onto the root console 
+  libtcod.console_blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
+  libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, SCREEN_HEIGHT - PANEL_HEIGHT)
+
+  libtcod.console_flush()
+
+  world.clear(con)
+
+def get_names_under_mouse():
+  global mouse
+
+  (x, y) = mouse.cx, mouse.cy
+
+  # names = [obj.name for obj in objects if obj.x == x and obj.y == y and libtcod.map_is_in_fov(world.map)]
+
+  return None
+
+mouse = libtcod.Mouse()
+key = libtcod.Key()
+
 def main():
   # Initialize libtcod root console
   libtcod.console_set_custom_font('arial10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
@@ -205,41 +283,26 @@ def main():
   # Create the world 
   world = World()
 
-  world.spawn_game_object("m_goblin_grunt", SCREEN_WIDTH / 2 + 5, SCREEN_HEIGHT / 2)
+  goblin_room = world.get_map().get_room(1)
 
+  goblinx = goblin_room.x1 + goblin_room.w / 2
+  gobliny = goblin_room.y1 + goblin_room.h / 2
+
+  world.spawn_game_object("m_goblin_grunt", goblinx, gobliny, blocks = True)
+  
   # Main loop
   while not libtcod.console_is_window_closed():
-    libtcod.console_set_default_foreground(0, libtcod.white)
-
-    # draw the world
-    world.render(con)
-
-    # render gui
-    libtcod.console_set_default_background(panel, libtcod.black)
-    libtcod.console_clear(panel)
-
-    # render msgs
-    y = 1
-    for (line, color) in game_msgs:
-      libtcod.console_set_default_foreground(panel, color)
-      libtcod.console_print_ex(panel, MSG_X, y, libtcod.BKGND_NONE, libtcod.LEFT, line)
-      y += 1
+    libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS | libtcod.EVENT_MOUSE, key, mouse)
     
-    render_bar(con, 1, 1, BAR_WIDTH, 'HP', 90, 100, libtcod.light_red, libtcod.darker_red)
-
-    # Copy our console onto the root console 
-    libtcod.console_blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
-    libtcod.console_blit(panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, SCREEN_HEIGHT - PANEL_HEIGHT)
-
-    libtcod.console_flush()
-
-    world.clear(con)
+    render(world, con, panel)
 
     # Get user input 
-    exit = handle_keys(world.get_player())
-    
+    exit = world.handle_keys()
+
     if exit:
       break
+
+    world.update()
 
 if __name__ == "__main__":
   main()

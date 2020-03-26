@@ -37,6 +37,9 @@ class Map:
 
     self.width = width
     self.height = height
+  
+  def get_room(self, id):
+    return self.rooms[id]
 
   def make_map(self, width, height):
     #filll map with "blocked" tiles
@@ -53,6 +56,8 @@ class Map:
 
     self.rooms = [room1, room2]
 
+  def get_tile(self, x, y):
+    return self.tiles[x][y]
 
   def render(self, con):
     for y in range(self.height):
