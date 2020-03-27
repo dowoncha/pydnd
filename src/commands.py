@@ -19,13 +19,27 @@ class MoveCommand(Command):
         if collider:
           world.send_command(AttackCommand(self.target, collider))
 
+class SpawnCommand(Command):
+  def __init__(self, prototype, x, y):
+    self.prototype = prototype
+    self.x = x
+    self.y = y
+
+  def execute(self, world):
+    id = world.spawn_game_object(
+      prototype = self.prototype, 
+      x = self.x, 
+      y = self.y)
+
+    message("Spawned " + str(id))
+
 class AttackCommand(Command):
   def __init__(self, attacker, target):
     self.attacker = attacker
     self.target = target
 
   def execute(self, world):
-    if self.target:
+    if self.target and self.target.hp:
       damage = 5
       self.target.apply_damage(damage)
 
@@ -40,7 +54,4 @@ class KillCommand(Command):
 
   def execute(self, world):
     if self.target and self.target.hp <= 0:
-      world.remove_object(self.target)
-
-      message(self.target.name + " has died")
-
+      world.kill(self.target)

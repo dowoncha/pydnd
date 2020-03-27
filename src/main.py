@@ -8,7 +8,7 @@ from datetime import datetime
 from log import render_msgs, message
 from collections import deque
 from rect import Rect, Map 
-from commands import AttackCommand, MoveCommand, KillCommand
+from commands import AttackCommand, MoveCommand, KillCommand, SpawnCommand
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PANEL_HEIGHT, BAR_WIDTH, MS_PER_UPDATE
 
 class GameObject:
@@ -26,14 +26,18 @@ class GameObject:
     blocks = False, 
     hp = None
   ):
-    self.id = id or ++GameObject.id_counter
+    if id is None:
+      self.id = str(++self.id_counter)
+    else:
+      self.id = str(id)
     self.x = int(x)
     self.y = int(y)
+    self.prototype = prototype
     self.name = name
     self.blocks = blocks
 
-    self.max_hp = hp
-    self.hp = hp
+    self.max_hp = hp or self.prototype.get('min_health')
+    self.hp = self.max_hp
 
     if char is not None:
       self.char = char
@@ -49,10 +53,26 @@ class GameObject:
     else:
       self.color = [0, 0, 0]
 
-    self.prototype = prototype
-
   def add_component(self, component):
     self.components.append(component)
+
+  @property
+  def x(self):
+    return self.__x
+
+  @x.setter
+  def x(self, x):
+    self.__x = x
+
+  @property
+  def blocks(self):
+    return self.__blocks or self.prototype.get('blocks')
+
+  @blocks.setter
+  def blocks(self, blocks):
+    self.__blocks = blocks
+    # if self.prototype:
+    #   self.prototype['blocks'] = blocks
 
   def set_position(self, x, y):
     self.x = x
@@ -77,6 +97,9 @@ class GameObject:
         return True
 
     return False
+
+  def on_death(self, world):
+    pass
 
 class World:
   def __init__(self):
@@ -109,16 +132,21 @@ class World:
 
     self.load_assets()
 
-    # goblin_room = self.get_map().get_room(0)
-
-    # goblinx = goblin_room.x1 + goblin_room.w / 2
-    # gobliny = goblin_room.y1 + goblin_room.h / 2
-
-    # self.spawn_game_object("m_goblin_grunt", goblinx, gobliny, blocks = True)
-
     self.objects = [npc, player]
-    
     self.commands = deque()
+    self.game_time = datetime.now()
+
+  def populate_map(self):
+    goblin = self.get_prototype('m_goblin_grunt')
+
+    if goblin is None:
+      return
+
+    for room in self.get_map().rooms:
+      x = room.x1 + room.w / 2
+      y = room.y1 + room.h / 2
+
+      self.send_command(SpawnCommand(goblin, x, y))
 
   def is_blocked(self, x, y):
     if self.game_map.get_tile(x, y).blocked:
@@ -133,15 +161,14 @@ class World:
   def get_map(self):
     return self.game_map
 
-  def spawn_game_object(self, id, x, y, blocks = False):
-    prototype = self.get_prototype(id)
-
-    if prototype is None:
-      return
-
-    object = GameObject(x, y, name = id, prototype = prototype, blocks = blocks)
+  def spawn_game_object(self, id = None, prototype = None, x = 0, y = 0):
+    object = GameObject(x, y, id = id, prototype = prototype)
 
     self.objects.append(object)
+
+    print("Spawned object w id " + object.id)
+
+    return object.id
 
   def get_prototype(self, id):
     asset = self.library.get(id)
@@ -191,11 +218,9 @@ class World:
     for object in self.objects:
       object.clear(console)
 
-  def update(self):
+  def update(self, elapsed):
     if len(self.commands) > 0:
       command = self.commands.popleft()
-
-      print('processing ', str(command))
 
       command.execute(self)
 
@@ -226,7 +251,16 @@ class World:
   def send_command(self, command):
     self.commands.append(command)
 
+  def kill(self, target):
+    target.on_death(self)
+
+    message(target.name + " has died")
+
+    self.remove_object(target)
+
   def remove_object(self, object):
+    print("Removing objects with id " + str(object.id))
+
     self.objects = [o for o in self.objects if not o.id == object.id]
 
   def search(self, x, y):
@@ -303,6 +337,8 @@ def main():
   # Create the world 
   world = World()
 
+  world.populate_map()
+
   last_time = datetime.now()
   lag = 0.0
 
@@ -323,9 +359,8 @@ def main():
     if exit:
       break
     
-
     while lag >= MS_PER_UPDATE:
-      world.update()
+      world.update(elapsed)
       lag -= MS_PER_UPDATE
 
     render(world, con, panel)

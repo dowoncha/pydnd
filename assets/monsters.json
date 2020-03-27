@@ -9,6 +9,7 @@
   "min_health": 20,
   "max_health": 30,
   "inventory": ["handaxe"],
+  "blocks": true,
   "experience": 10
 }, {
   "id": "m_goblin_wizard",
