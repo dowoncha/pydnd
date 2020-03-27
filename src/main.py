@@ -283,7 +283,7 @@ def main():
   # Create the world 
   world = World()
 
-  goblin_room = world.get_map().get_room(1)
+  goblin_room = world.get_map().get_room(0)
 
   goblinx = goblin_room.x1 + goblin_room.w / 2
   gobliny = goblin_room.y1 + goblin_room.h / 2
