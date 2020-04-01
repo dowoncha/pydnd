@@ -1,11 +1,12 @@
 import libtcodpy as libtcod
+import tcod.console
+
 color_dark_wall = libtcod.Color(0, 0, 100)
 color_dark_ground = libtcod.Color(50, 50, 150)
 
 ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
 MAX_ROOMS = 30
-
 
 class Rect:
     # a rectangle on the map. used to characterize a room.
@@ -27,7 +28,6 @@ class Rect:
       return (self.x1 <= other.x2 and self.x2 > + other.x1 and
               self.y1 <= other.y2 and self.y2 >= other.y1)
 
-
 class Tile:
   def __init__(self, blocked, block_sight=None):
     self.blocked = blocked
@@ -37,6 +37,12 @@ class Tile:
 
     self.block_sight = block_sight
 
+class Cell:
+	def __init__(self, tile, prop, entity, item):
+		self.tile = tile
+		self.prop = prop
+		self.entity = entity
+		self.item = item
 
 class Map:
 	def __init__(self, width, height, tiles=None):
@@ -54,7 +60,6 @@ class Map:
 			for y in range(room.y1 + 1, room.y2):
 				self.tiles[x][y].blocked = False
 				self.tiles[x][y].block_sight = False
-
 
 	def dun_maker(self, width, height):
 		rooms = []
@@ -106,8 +111,6 @@ class Map:
 				# finally, append the new room to the lis
 				rooms.append(new_room)
 				num_rooms += 1
-
-		print(rooms)
 	
 		self.rooms = rooms 
 
@@ -125,14 +128,14 @@ class Map:
 	def get_tile(self, x, y):
 		return self.tiles[x][y]
 
-	def render(self, con):
+	def render(self, console: tcod.console.Console):
 		for y in range(self.height):
 			for x in range(self.width):
 				wall = self.tiles[x][y].block_sight
 				if wall: 
-					libtcod.console_set_char_background(con, x, y, color_dark_wall, libtcod.BKGND_SET)
+					libtcod.console_set_char_background(console, x, y, color_dark_wall, libtcod.BKGND_SET)
 				else:
-					libtcod.console_set_char_background(con, x, y, color_dark_ground, libtcod.BKGND_SET)
+					libtcod.console_set_char_background(console, x, y, color_dark_ground, libtcod.BKGND_SET)
 
 	def create_h_tunnel(self, x1, x2, y):
   		for x in range(int(min(x2, x1)), int(max(x2,x1) + 1)):

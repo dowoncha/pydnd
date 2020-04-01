@@ -1,4 +1,10 @@
 import libtcodpy as libtcod
+import tcod.color
+import tcod.console
+from typing import List, Tuple
+
+class Item:
+  pass
 
 class GameObject:
   id_counter = 1
@@ -7,84 +13,68 @@ class GameObject:
 
   def __init__(
     self, 
-    x, 
-    y, 
-    id = None, 
-    name = "game_object", 
-    char = None, 
-    color = None, 
-    # prototype = None, 
-    blocks = False, 
-    hp = None,
-    speed = 1
+    x: int = 0, 
+    y: int = 0, 
+    id: str = None, 
+    name: str = "game_object", 
+    char: int = ord(' '), 
+    color: Tuple[int, int, int] = [0, 0, 0], 
+    prototype = None, 
+    blocks: bool = False, 
+    hp: int = None,
+    speed: int = 1,
+    inventory: List[Item] = []
   ):
+    GameObject.id_counter += 1
+
     if id is None:
-      self.id = str(++self.id_counter)
+      self.id = str(GameObject.id_counter)
     else:
       self.id = str(id)
+
     self.x = int(x)
     self.y = int(y)
     # self.prototype = prototype
     self.name = name
     self.blocks = blocks
 
-    self.max_hp = hp # or self.prototype.get('min_health')
+    self.max_hp = hp 
     self.hp = self.max_hp
 
-    if char is not None:
-      self.char = char
-    # elif prototype and prototype.get('char'):
-      # self.char = prototype.get('char')
-    else:
-      self.char = ' '
+    self.char = ord(char) if type(char) is str else char
 
-    if color is not None:
-      self.color = color
-    # elif prototype and prototype.get('color'):
-      # self.color = prototype.get('color')
-    else:
-      self.color = [0, 0, 0]
+    self.color = color
 
     self.speed = speed
-    self.components = []
-
-  def add_component(self, component):
-    self.components.append(component)
+    self.prototype = prototype
+    self.inventory = inventory
 
   @property
-  def x(self):
-    return self.__x
-
-  @x.setter
-  def x(self, x):
-    self.__x = x
-
-  @property
-  def blocks(self):
+  def blocks(self) -> bool:
     return self.__blocks # or self.prototype.get('blocks')
 
   @blocks.setter
-  def blocks(self, blocks):
+  def blocks(self, blocks: bool):
     self.__blocks = blocks
     # if self.prototype:
     #   self.prototype['blocks'] = blocks
 
-  def set_position(self, x, y):
+  def set_position(self, x: int, y: int):
     self.x = x
     self.y = y
 
-  def move(self, dx, dy):
+  def move(self, dx: int, dy: int):
     self.x += dx
     self.y += dy
 
-  def draw(self, console):
-    libtcod.console_set_default_foreground(console, self.color)
-    libtcod.console_put_char(console, int(self.x), int(self.y), self.char, libtcod.BKGND_NONE)
+  def render(self, console: tcod.console.Console):
+    console.default_fg = self.color
+    console.put_char(int(self.x), int(self.y), int(self.char))
   
-  def clear(self, con) :
-    libtcod.console_put_char(con, int(self.x), int(self.y), ' ', libtcod.BKGND_NONE)
+  def clear(self, console: tcod.console.Console):
+    libtcod.console_put_char(console, int(self.x), int(self.y), ' ', libtcod.BKGND_NONE)
 
-  def apply_damage(self, damage):
+  def apply_damage(self, damage: int) -> bool:
     if self.hp is not None:
       self.hp -= damage
 
@@ -98,4 +88,3 @@ class GameObject:
   
   def on_death(self, world):
     pass
-

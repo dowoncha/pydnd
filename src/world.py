@@ -10,15 +10,40 @@ from rect import Map
 from time_schedule import TimeSchedule
 from commands import SpawnCommand, MoveCommand
 
+def prototype_to_game_object(prototype):
+  id = prototype.get('id')
+  race = prototype.get('race')
+  char = prototype.get('char')
+  color = prototype.get('color')
+  level = prototype.get('level')
+  g_class = prototype.get('class')
+  min_health = prototype.get('min_health')
+  max_health = prototype.get('max_health')
+  inventory = prototype.get('handaxe')
+  blocks = prototype.get('true')
+
+  return GameObject(
+    id = id, 
+    race = race,
+    char = char,
+    color = color,
+    level = level,
+    hp = max_health,
+    inventory = inventory,
+    blocks = blocks
+  )
+
 class World:
   def __init__(self):
     self.game_map = Map(MAP_WIDTH, MAP_HEIGHT)
+    self.objects = []
+
     start_room = self.game_map.rooms[0]
 
     playerx = start_room.w / 2 + start_room.x1
     playery = start_room.h / 2 + start_room.y1
 
-    player = GameObject(
+    self.spawn_game_object(
       playerx, 
       playery, 
       id = "player",
@@ -27,6 +52,7 @@ class World:
       color = libtcod.white,
       blocks = True,
       hp = 100,
+      inventory = ['handaxe']
     )
 
     npc = GameObject(
@@ -41,7 +67,6 @@ class World:
 
     self.load_assets()
 
-    self.objects = [npc, player]
     self.commands = deque()
     self.commands_history = []
     self.game_time = datetime.now()
@@ -76,8 +101,8 @@ class World:
   def get_map(self):
     return self.game_map
 
-  def spawn_game_object(self, id = None, prototype = None, x = 0, y = 0):
-    object = GameObject(x, y, id = id)
+  def spawn_game_object(self, x, y, id = None, prototype = None, **kwargs):
+    object = GameObject(x, y, id = id, prototype = prototype, **kwargs)
 
     self.objects.append(object)
 
@@ -126,16 +151,16 @@ class World:
     return [object for object in self.objects if object.id == "player"][0]
 
   def render(self, console):
-    for object in self.objects:
-      object.draw(console)
-
     self.game_map.render(console)
+
+    for object in self.objects:
+      object.render(console)
 
   def clear(self, console):
     for object in self.objects:
       object.clear(console)
 
-  def update(self, elapsed):
+  def update(self, elapsed = None):
     if len(self.commands) > 0:
       command = self.commands.popleft()
 
@@ -158,30 +183,8 @@ class World:
 
     #   self.scheduler.schedule_event(object, object.action_delay())
 
-
-  def handle_keys(self):
-    key = libtcod.console_wait_for_keypress(True)
-    if key.vk == libtcod.KEY_ENTER and key.lalt:
-      libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
-    elif key.vk == libtcod.KEY_ESCAPE:
-      return True
-    
-    player = self.get_player()
-
-    if player:
-      new_x = player.x
-      new_y = player.y
-
-      if libtcod.console_is_key_pressed(libtcod.KEY_UP):
-        new_y -= 1
-      elif libtcod.console_is_key_pressed(libtcod.KEY_DOWN):
-        new_y += 1
-      elif libtcod.console_is_key_pressed(libtcod.KEY_LEFT):
-        new_x -= 1
-      elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT):
-        new_x += 1
-      
-      self.send_command(MoveCommand(player, new_x, new_y))
+  def get_object_id(self, id: str) -> GameObject:
+    return [obj for obj in self.objects if obj.id == id][0]
 
   def send_command(self, command):
     self.commands.append(command)

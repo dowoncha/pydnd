@@ -19,8 +19,31 @@ class MoveCommand(Command):
         if collider:
           world.send_command(AttackCommand(self.target, collider))
 
+class WalkCmd(Command):
+  def __init__(self, id: str, dx: int, dy: int):
+    self.id = id
+    self.dx = dx
+    self.dy = dy
+
+  def execute(self, world):
+    if self.id:
+      target = world.get_object_id(self.id)
+
+      if target is not None:
+        new_x = target.x + self.dx
+        new_y = target.y + self.dy
+
+        if not world.is_blocked(new_x, new_y):
+          target.set_position(new_x, new_y)
+        else:
+          collider = world.search(new_x, new_y)
+          
+          if collider:
+            world.send_command(AttackCommand(target, collider))
+
+
 class SpawnCommand(Command):
-  def __init__(self, prototype, x, y):
+  def __init__(self, prototype, x: int, y: int):
     self.prototype = prototype
     self.x = x
     self.y = y
@@ -55,3 +78,10 @@ class KillCommand(Command):
   def execute(self, world):
     if self.target and self.target.hp <= 0:
       world.kill(self.target)
+
+class PrintCmd(Command):
+  def __init__(self, msg):
+    self.msg = msg
+  
+  def execute(self, world):
+    message(self.msg)

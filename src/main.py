@@ -4,36 +4,56 @@ import textwrap
 import queue
 import logging
 from datetime import datetime
+import time
+from typing import Dict
+
+import tcod.event
+import tcod.console
 
 from log import render_msgs, message
 from collections import deque
 from rect import Rect, Map 
-from commands import AttackCommand, MoveCommand, KillCommand, SpawnCommand
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PANEL_HEIGHT, BAR_WIDTH, MS_PER_UPDATE
+from commands import Command, AttackCommand, MoveCommand, WalkCmd, KillCommand, SpawnCommand, PrintCmd
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH, MAP_HEIGHT, PANEL_HEIGHT, BAR_WIDTH, MS_PER_UPDATE, UPDATE_PER_FRAME_LIMIT
+from tcod import event
 
 from world import World
-def get_names_under_mouse():
-  global mouse
 
-  (x, y) = mouse.cx, mouse.cy
+def time_in_millis():
+  return int(round(time.time() * 1000))
 
-  # names = [obj.name for obj in objects if obj.x == x and obj.y == y and libtcod.map_is_in_fov(world.map)]
+class GameTime:
+  def __init__(self):
+    self.clock = 0
+    self.last_actual = 0
+    self.next_update = 0
 
-  return None
+class CommandManager:
+  def __init__(self):
+    self.bindings: Dict[int, Command] = {
+      tcod.event.K_c: PrintCmd("Toggle character sheet"),
+      tcod.event.K_UP: WalkCmd(id = "player", dx = 0, dy = -1),
+      tcod.event.K_DOWN: WalkCmd(id = "player", dx = 0, dy = 1),
+      tcod.event.K_RIGHT: WalkCmd(id = "player", dx = 1, dy = 0),
+      tcod.event.K_LEFT: WalkCmd(id = "player", dx = -1, dy = 0)
+    }
 
-mouse = libtcod.Mouse()
-key = libtcod.Key()
+  def get_command(self, key: int) -> Command:
+    return self.bindings.get(key)
+
+  def bind_command(self, key: int, command: Command):
+    self.bindings[key] = command
 
 class Engine:
   def __init__(self):
-  # Initialize libtcod root console
+    # Initialize libtcod root console
     libtcod.console_set_custom_font('arial10x10.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
-    libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python dnd', False, renderer=libtcod.RENDERER_OPENGL2)
+    self.root = libtcod.console_init_root(SCREEN_WIDTH, SCREEN_HEIGHT, 'python dnd', False, renderer=libtcod.RENDERER_OPENGL2)
 
     # Create our own main console
-    self.con = libtcod.console_new(SCREEN_WIDTH, SCREEN_HEIGHT)
+    self.con = tcod.console.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-    self.panel = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
+    self.panel = tcod.console.Console(SCREEN_WIDTH, PANEL_HEIGHT)
 
     # Create the world 
     world = World()
@@ -42,44 +62,54 @@ class Engine:
 
     self.world = world
 
-  def run(self):
-    last_time = datetime.now()
-    lag = 0.0
+    self.game_time = GameTime()
 
+    self.command_manager = CommandManager()
+
+  def run(self):
     # Main loop
     while not libtcod.console_is_window_closed():
-      current_time = datetime.now()
-      elapsed = current_time - last_time
+      current_time = time_in_millis()
 
-      last_time = current_time
-      lag += elapsed.microseconds
+      if current_time - self.game_time.last_actual > MS_PER_UPDATE * UPDATE_PER_FRAME_LIMIT:
+        self.game_time.clock += (MS_PER_UPDATE * UPDATE_PER_FRAME_LIMIT)
+      else:
+        self.game_time.clock += (current_time - self.game_time.last_actual)
 
-      # process input 
-      libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS | libtcod.EVENT_MOUSE, key, mouse)
+      while self.game_time.clock >= self.game_time.next_update:
+        self.time_elapsed = MS_PER_UPDATE
+        self.time_current = self.game_time.next_update
 
-      # Get user input 
-      exit = self.world.handle_keys()
+        self.update()
 
-      if exit:
-        break
-      
-      while lag >= MS_PER_UPDATE:
-        self.world.update(elapsed)
-        lag -= MS_PER_UPDATE
+        self.game_time.next_update += MS_PER_UPDATE
+
+      self.game_time.last_actual = time_in_millis()
 
       self.render()
 
-      last_time = current_time
+      # Handle input
+      for event in tcod.event.get():
+        if event.type == "KEYDOWN":
+          # Key escape
+          if event.sym == 27:
+            raise SystemExit()
+          else:
+            self.check_command(event)
+        elif event.type == "MOUSEBUTTONDOWN":
+          pass
+        elif event.type == "MOUSEMOTION":
+          self.mouse = event
 
   def render(self):
-    libtcod.console_set_default_foreground(0, libtcod.white)
+    self.root.default_fg = (255, 255, 255)
 
     # draw the world
     self.world.render(self.con)
 
     # render gui
-    libtcod.console_set_default_background(self.panel, libtcod.black)
-    libtcod.console_clear(self.panel)
+    self.panel.default_bg = libtcod.black
+    self.panel.clear()
 
     render_msgs(self.panel)
     
@@ -90,8 +120,8 @@ class Engine:
     # libtcod.console_print_ex(panel, 1, 0, libtcod.BKGND_NONE, libtcod.LEFT, get_names_under_mouse())
 
     # Copy our console onto the root console 
-    libtcod.console_blit(self.con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0)
-    libtcod.console_blit(self.panel, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT, 0, 0, SCREEN_HEIGHT - PANEL_HEIGHT)
+    self.con.blit(self.root, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+    self.panel.blit(self.root, 0, SCREEN_HEIGHT - PANEL_HEIGHT, 0, 0, SCREEN_WIDTH, PANEL_HEIGHT) # 0, 0, 
 
     libtcod.console_flush()
 
@@ -112,6 +142,45 @@ class Engine:
     # Text
     libtcod.console_set_default_foreground(con, libtcod.white)
     libtcod.console_print_ex(con, int(x + total_width / 2), y, libtcod.BKGND_NONE, libtcod.CENTER, name + ': ' + str(value) + '/' + str(max))
+
+  def check_command(self, key_event: tcod.event.KeyboardEvent):
+    # key = libtcod.console_wait_for_keypress(True)
+    # if key.vk == libtcod.KEY_ENTER and key.lalt:
+    #   libtcod.console_set_fullscreen(not libtcod.console_is_fullscreen())
+    # elif key.vk == libtcod.KEY_ESCAPE:
+    #   return True
+    
+    # player = self.get_player()
+
+    # if player:
+    #   new_x = player.x
+    #   new_y = player.y
+
+    #   if libtcod.console_is_key_pressed(libtcod.KEY_UP):
+    #     new_y -= 1
+    #   elif libtcod.console_is_key_pressed(libtcod.KEY_DOWN):
+    #     new_y += 1
+    #   elif libtcod.console_is_key_pressed(libtcod.KEY_LEFT):
+    #     new_x -= 1
+    #   elif libtcod.console_is_key_pressed(libtcod.KEY_RIGHT):
+    #     new_x += 1
+      
+    #   self.send_command(MoveCommand(player, new_x, new_y))
+
+    if key_event.sym:
+      command = self.command_manager.get_command(key_event.sym)
+
+      if command is not None:
+        self.world.send_command(command)
+
+  def update(self):
+    # print('clock', self.game_time.clock)
+    # print(self.game_time.last_actual)
+    # print(self.game_time.next_update)
+    # print(self.time_elapsed)
+    # print(self.time_current)
+
+    self.world.update()
 
 def main():
   engine = Engine()
